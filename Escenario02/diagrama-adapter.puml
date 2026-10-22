@@ -1,0 +1,89 @@
+@startuml diagrama-adapter
+title Escenario 02 - Patrón Adapter (de objetos)
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+  BackgroundColor<<Client>>  #DAE8FC
+  BorderColor<<Client>>      #6C8EBF
+  BackgroundColor<<Target>>  #D5E8D4
+  BorderColor<<Target>>      #82B366
+  BackgroundColor<<Adapter>> #FFE6CC
+  BorderColor<<Adapter>>     #D79B00
+  BackgroundColor<<Adaptee>> #F8CECC
+  BorderColor<<Adaptee>>     #B85450
+}
+
+package "universidad.asistencia" {
+  class SistemaAsistencia <<Client>> {
+    - servicio : ServicioAsistencia
+    + SistemaAsistencia(servicio : ServicioAsistencia)
+    + consultar(idColaborador : String, fecha : LocalDate) : String
+  }
+
+  interface ServicioAsistencia <<Target>> {
+    + obtenerAsistencia(idColaborador : String, fecha : LocalDate) : Optional<RegistroAsistencia>
+  }
+
+  class RegistroAsistencia <<record>> {
+    + idColaborador : String
+    + fecha : LocalDate
+    + horaIngreso : LocalTime
+    + horaSalida : LocalTime
+  }
+}
+
+package "universidad.dispositivos" {
+  class DispositivoProveedorA {
+    + obtenerAsistencia(idColaborador : String, fecha : LocalDate) : Optional<RegistroAsistencia>
+  }
+
+  class AdaptadorFabricanteB <<Adapter>> {
+    - sdk : BiometricDeviceSdk
+    - zona : ZoneId
+    + AdaptadorFabricanteB(sdk : BiometricDeviceSdk, zona : ZoneId)
+    + obtenerAsistencia(idColaborador : String, fecha : LocalDate) : Optional<RegistroAsistencia>
+    - primeraHora(marcaciones : List<PunchRecord>, tipo : TipoMarcacion) : LocalTime
+    - ultimaHora(marcaciones : List<PunchRecord>, tipo : TipoMarcacion) : LocalTime
+    - aHora(p : PunchRecord) : LocalTime
+  }
+}
+
+package "com.fabricanteb.sdk (NO modificable)" {
+  class BiometricDeviceSdk <<Adaptee>> {
+    - memoria : List<PunchRecord>
+    + fetchPunches(userCode : int, fromMillis : long, toMillis : long) : List<PunchRecord>
+  }
+
+  class PunchRecord <<Adaptee>> {
+    - userCode : int
+    - timestampMillis : long
+    - type : TipoMarcacion
+    + getUserCode() : int
+    + getTimestampMillis() : long
+    + getType() : TipoMarcacion
+  }
+
+  enum TipoMarcacion <<Adaptee>> {
+    CHECK_IN
+    CHECK_OUT
+  }
+}
+
+SistemaAsistencia --> ServicioAsistencia : usa
+ServicioAsistencia ..> RegistroAsistencia : retorna
+DispositivoProveedorA ..|> ServicioAsistencia
+AdaptadorFabricanteB ..|> ServicioAsistencia
+AdaptadorFabricanteB --> BiometricDeviceSdk : delega (-sdk)
+BiometricDeviceSdk ..> PunchRecord : retorna
+PunchRecord --> TipoMarcacion
+
+note bottom of AdaptadorFabricanteB
+  <b>Transformaciones</b>
+  1. String id -> int userCode
+  2. LocalDate -> [inicio día, día siguiente) en epoch ms
+  3. List<PunchRecord> -> RegistroAsistencia
+     (primer CHECK_IN, último CHECK_OUT)
+  4. Sin marcaciones -> Optional.empty()
+end note
+@enduml

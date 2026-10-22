@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escenario 02 – Adapter</title>
+<style>
+  :root {
+    --bg: #fafaf7; --fg: #1f2328; --muted: #59636e; --line: #d8dee4;
+    --card: #ffffff; --accent: #b4590c; --code-bg: #f3f4f1;
+    --client: #dae8fc; --target: #d5e8d4; --adapter: #ffe6cc; --adaptee: #f8cecc;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 48px 20px 80px; }
+  header { border-bottom: 2px solid var(--fg); padding-bottom: 16px; margin-bottom: 32px; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  h1 { font-size: 2rem; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 1.35rem; margin: 48px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h2 .n { color: var(--accent); margin-right: 8px; }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  nav ol { columns: 2; padding-left: 20px; margin: 0; color: var(--muted); }
+  nav a { color: inherit; }
+  blockquote { margin: 0; padding: 12px 16px; background: var(--card); border-left: 4px solid var(--accent);
+               white-space: pre-line; font-size: .95rem; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; background: var(--card); font-size: .93rem; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #eef0ec; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: .88em;
+         background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+        padding: 14px 16px; overflow-x: auto; font-size: .85rem; line-height: 1.5; margin: 0; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: .88rem; margin-top: 8px; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 6px; margin: 10px 0; }
+  details summary { cursor: pointer; padding: 10px 14px; font-weight: 600; }
+  details summary small { font-weight: 400; color: var(--muted); margin-left: 8px; }
+  details pre { border: 0; border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: .8rem; font-weight: 600; }
+  .client { background: var(--client); } .target { background: var(--target); }
+  .adapter { background: var(--adapter); } .adaptee { background: var(--adaptee); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .box h3 { margin-top: 0; }
+  .ok { border-top: 4px solid #2f8a4c; } .mod { border-top: 4px solid var(--accent); }
+  ul, ol { padding-left: 22px; }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>Escenario 02 · Integración de dispositivos biométricos</h1>
+  <p>Patrones de Diseño de Software · Actividad 2 · Patrón estructural <strong>Adapter</strong></p>
+</header>
+
+<nav>
+  <ol start="0">
+    <li><a href="#escenario">Escenario</a></li>
+    <li><a href="#problema">Problema estructural</a></li>
+    <li><a href="#patron">Patrón seleccionado</a></li>
+    <li><a href="#uml">Diagrama UML</a></li>
+    <li><a href="#participantes">Participantes</a></li>
+    <li><a href="#implementacion">Implementación</a></li>
+    <li><a href="#correspondencia">Correspondencia UML ↔ código</a></li>
+    <li><a href="#ia">Uso crítico de IA</a></li>
+  </ol>
+</nav>
+
+<h2 id="escenario"><span class="n">0</span>Escenario</h2>
+<p>Una universidad registra la asistencia de sus colaboradores mediante un contrato común que, dada una persona y una fecha, devuelve información normalizada: <strong>identificación, fecha, hora de ingreso y hora de salida</strong>. Los dispositivos del proveedor histórico ya cumplen ese contrato.</p>
+<p>Se adquieren equipos de otro fabricante cuya biblioteca <strong>no puede modificarse</strong> y expone una interfaz distinta: recupera una <em>colección de marcaciones</em> con operaciones, parámetros y tipos propios. La universidad necesita mantener estable su contrato, evitar la dependencia del proveedor y poder incorporar en el futuro equipos de otros fabricantes.</p>
+
+<h2 id="problema"><span class="n">1</span>Problema estructural</h2>
+<p>Hay una <strong>incompatibilidad de interfaces</strong> entre el cliente (sistema institucional) y un componente existente que no puede modificarse (SDK del fabricante B):</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Aspecto</th><th>Contrato institucional</th><th>SDK Fabricante B</th></tr>
+  <tr><td>Operación</td><td><code>obtenerAsistencia(id, fecha)</code></td><td><code>fetchPunches(userCode, fromMillis, toMillis)</code></td></tr>
+  <tr><td>Identificador</td><td><code>String</code></td><td><code>int</code></td></tr>
+  <tr><td>Fecha</td><td><code>LocalDate</code></td><td>rango epoch en milisegundos</td></tr>
+  <tr><td>Resultado</td><td>un <code>RegistroAsistencia</code> (ingreso / salida)</td><td><code>List&lt;PunchRecord&gt;</code> (marcaciones sueltas)</td></tr>
+</table>
+</div>
+<p>No se puede modificar el cliente, porque se acoplaría al proveedor. Tampoco el SDK, porque se perdería la compatibilidad con versiones futuras. Se necesita un intermediario que convierta una interfaz en la otra.</p>
+
+<h2 id="patron"><span class="n">2</span>Patrón seleccionado: Adapter (de objetos)</h2>
+<ul>
+  <li><strong>Intención GoF:</strong> convertir la interfaz de una clase en otra que el cliente espera, sin modificar a ninguna de las dos.</li>
+  <li><strong>Variante de objetos (composición), no de clases (herencia):</strong> Java no admite herencia múltiple de clases, el SDK puede ser <code>final</code> o cambiar entre versiones, y la composición reduce el acoplamiento y permite inyectar el SDK.</li>
+  <li><strong>Extensibilidad (OCP):</strong> un proveedor nuevo solo requiere un adaptador nuevo (p. ej. <code>AdaptadorFabricanteC</code>) y el cliente no se toca.</li>
+  <li><strong>Alternativas descartadas:</strong> <em>Facade</em> simplifica un subsistema pero no lo ajusta a un contrato existente. <em>Bridge</em> se diseña de antemano para separar abstracción e implementación, y aquí la incompatibilidad ya está dada.</li>
+</ul>
+
+<h2 id="uml"><span class="n">3</span>Diagrama de clases UML</h2>
+<figure>
+  <img src="diagrama-adapter.png" alt="Diagrama de clases UML del patrón Adapter: SistemaAsistencia usa ServicioAsistencia; DispositivoProveedorA y AdaptadorFabricanteB lo implementan; AdaptadorFabricanteB delega en BiometricDeviceSdk, que retorna PunchRecord con TipoMarcacion.">
+  <figcaption>Colores por rol: <span class="tag client">Client</span> <span class="tag target">Target</span> <span class="tag adapter">Adapter</span> <span class="tag adaptee">Adaptee</span>. Fuente PlantUML: <a href="diagrama-adapter.puml">diagrama-adapter.puml</a>.</figcaption>
+</figure>
+
+<h2 id="participantes"><span class="n">4</span>Participantes del patrón</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Rol (GoF)</th><th>Clase</th><th>Responsabilidad</th></tr>
+  <tr><td><span class="tag client">Client</span></td><td><code>SistemaAsistencia</code></td><td>Consulta la asistencia usando solo el contrato institucional.</td></tr>
+  <tr><td><span class="tag target">Target</span></td><td><code>ServicioAsistencia</code> (+ <code>RegistroAsistencia</code>)</td><td>Contrato estable y estructura normalizada.</td></tr>
+  <tr><td><span class="tag adaptee">Adaptee</span></td><td><code>BiometricDeviceSdk</code> (+ <code>PunchRecord</code>, <code>TipoMarcacion</code>)</td><td>Biblioteca del fabricante B, incompatible y no modificable.</td></tr>
+  <tr><td><span class="tag adapter">Adapter</span></td><td><code>AdaptadorFabricanteB</code></td><td>Implementa el Target, compone al Adaptee y traduce parámetros y resultados.</td></tr>
+  <tr><td>Implementación nativa</td><td><code>DispositivoProveedorA</code></td><td>Proveedor histórico. Ya cumple el contrato y no necesita adaptador.</td></tr>
+</table>
+</div>
+<h3>Transformaciones que realiza el Adapter</h3>
+<ol>
+  <li><code>String idColaborador</code> → <code>int userCode</code>.</li>
+  <li><code>LocalDate fecha</code> → rango <code>[inicio del día, inicio del día siguiente)</code> en epoch ms según <code>ZoneId</code>.</li>
+  <li><code>List&lt;PunchRecord&gt;</code> → <code>RegistroAsistencia</code>: ingreso = <code>CHECK_IN</code> más temprano, salida = <code>CHECK_OUT</code> más tardío.</li>
+  <li>Sin marcaciones → <code>Optional.empty()</code>.</li>
+</ol>
+
+<h2 id="implementacion"><span class="n">5</span>Implementación (Java 17)</h2>
+<p>Estructura de paquetes. El paquete <code>com.fabricanteb.sdk</code> simula la biblioteca externa.</p>
+<pre><code>src/
+├── universidad/
+│   ├── Main.java
+│   ├── asistencia/    ServicioAsistencia · RegistroAsistencia · SistemaAsistencia
+│   └── dispositivos/  DispositivoProveedorA · AdaptadorFabricanteB
+└── com/fabricanteb/sdk/  BiometricDeviceSdk · PunchRecord · TipoMarcacion</code></pre>
+
+<details><summary>ServicioAsistencia.java<small>Target · src/universidad/asistencia/ServicioAsistencia.java</small></summary><pre><code>package universidad.asistencia;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+/** Target: contrato estable del sistema institucional. */
+public interface ServicioAsistencia {
+    Optional&lt;RegistroAsistencia&gt; obtenerAsistencia(String idColaborador, LocalDate fecha);
+}</code></pre></details>
+<details><summary>RegistroAsistencia.java<small>Target (dato normalizado) · src/universidad/asistencia/RegistroAsistencia.java</small></summary><pre><code>package universidad.asistencia;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+/** Estructura normalizada que espera el sistema institucional. */
+public record RegistroAsistencia(String idColaborador, LocalDate fecha,
+                                 LocalTime horaIngreso, LocalTime horaSalida) {
+}</code></pre></details>
+<details><summary>SistemaAsistencia.java<small>Client · src/universidad/asistencia/SistemaAsistencia.java</small></summary><pre><code>package universidad.asistencia;
+
+import java.time.LocalDate;
+
+/** Client: solo conoce el contrato ServicioAsistencia. */
+public class SistemaAsistencia {
+    private final ServicioAsistencia servicio;
+
+    public SistemaAsistencia(ServicioAsistencia servicio) {
+        this.servicio = servicio;
+    }
+
+    public String consultar(String idColaborador, LocalDate fecha) {
+        return servicio.obtenerAsistencia(idColaborador, fecha)
+                .map(r -&gt; String.format("%s | %s | ingreso %s | salida %s",
+                        r.idColaborador(), r.fecha(), r.horaIngreso(), r.horaSalida()))
+                .orElse(idColaborador + " | " + fecha + " | sin registros");
+    }
+}</code></pre></details>
+<details open><summary>AdaptadorFabricanteB.java<small>Adapter · src/universidad/dispositivos/AdaptadorFabricanteB.java</small></summary><pre><code>package universidad.dispositivos;
+
+import com.fabricanteb.sdk.BiometricDeviceSdk;
+import com.fabricanteb.sdk.PunchRecord;
+import com.fabricanteb.sdk.TipoMarcacion;
+import universidad.asistencia.RegistroAsistencia;
+import universidad.asistencia.ServicioAsistencia;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+
+/** Adapter (de objetos): traduce ServicioAsistencia -&gt; BiometricDeviceSdk. */
+public class AdaptadorFabricanteB implements ServicioAsistencia {
+    private final BiometricDeviceSdk sdk;
+    private final ZoneId zona;
+
+    public AdaptadorFabricanteB(BiometricDeviceSdk sdk, ZoneId zona) {
+        this.sdk = sdk;
+        this.zona = zona;
+    }
+
+    @Override
+    public Optional&lt;RegistroAsistencia&gt; obtenerAsistencia(String idColaborador, LocalDate fecha) {
+        // 1. Transformar parametros: String -&gt; int, LocalDate -&gt; rango epoch
+        int userCode = Integer.parseInt(idColaborador);
+        long desde = fecha.atStartOfDay(zona).toInstant().toEpochMilli();
+        long hasta = fecha.plusDays(1).atStartOfDay(zona).toInstant().toEpochMilli();
+
+        // 2. Delegar en la operacion propia del fabricante
+        List&lt;PunchRecord&gt; marcaciones = sdk.fetchPunches(userCode, desde, hasta);
+        if (marcaciones.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // 3. Transformar resultado: coleccion de marcaciones -&gt; registro diario
+        LocalTime ingreso = primeraHora(marcaciones, TipoMarcacion.CHECK_IN);
+        LocalTime salida = ultimaHora(marcaciones, TipoMarcacion.CHECK_OUT);
+        return Optional.of(new RegistroAsistencia(idColaborador, fecha, ingreso, salida));
+    }
+
+    private LocalTime primeraHora(List&lt;PunchRecord&gt; marcaciones, TipoMarcacion tipo) {
+        return marcaciones.stream().filter(p -&gt; p.getType() == tipo)
+                .map(this::aHora).min(LocalTime::compareTo).orElse(null);
+    }
+
+    private LocalTime ultimaHora(List&lt;PunchRecord&gt; marcaciones, TipoMarcacion tipo) {
+        return marcaciones.stream().filter(p -&gt; p.getType() == tipo)
+                .map(this::aHora).max(LocalTime::compareTo).orElse(null);
+    }
+
+    private LocalTime aHora(PunchRecord p) {
+        return Instant.ofEpochMilli(p.getTimestampMillis()).atZone(zona).toLocalTime();
+    }
+}</code></pre></details>
+<details><summary>DispositivoProveedorA.java<small>Implementación nativa del Target · src/universidad/dispositivos/DispositivoProveedorA.java</small></summary><pre><code>package universidad.dispositivos;
+
+import universidad.asistencia.RegistroAsistencia;
+import universidad.asistencia.ServicioAsistencia;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Optional;
+
+/** Proveedor historico: ya cumple el contrato, no requiere adaptacion. */
+public class DispositivoProveedorA implements ServicioAsistencia {
+    @Override
+    public Optional&lt;RegistroAsistencia&gt; obtenerAsistencia(String idColaborador, LocalDate fecha) {
+        return Optional.of(new RegistroAsistencia(idColaborador, fecha,
+                LocalTime.of(8, 0), LocalTime.of(17, 0)));
+    }
+}</code></pre></details>
+<details><summary>BiometricDeviceSdk.java<small>Adaptee · src/com/fabricanteb/sdk/BiometricDeviceSdk.java</small></summary><pre><code>package com.fabricanteb.sdk;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Adaptee: SDK del fabricante con interfaz incompatible (NO modificable). */
+public class BiometricDeviceSdk {
+    private final List&lt;PunchRecord&gt; memoria = new ArrayList&lt;&gt;();
+
+    public BiometricDeviceSdk() {
+        // Datos simulados del dispositivo
+        ZoneId zona = ZoneId.systemDefault();
+        memoria.add(new PunchRecord(1001, epoch(2026, 10, 15, 7, 52, zona), TipoMarcacion.CHECK_IN));
+        memoria.add(new PunchRecord(1001, epoch(2026, 10, 15, 12, 30, zona), TipoMarcacion.CHECK_OUT));
+        memoria.add(new PunchRecord(1001, epoch(2026, 10, 15, 16, 48, zona), TipoMarcacion.CHECK_OUT));
+    }
+
+    /** Recupera marcaciones de un usuario en el rango [fromMillis, toMillis). */
+    public List&lt;PunchRecord&gt; fetchPunches(int userCode, long fromMillis, long toMillis) {
+        List&lt;PunchRecord&gt; res = new ArrayList&lt;&gt;();
+        for (PunchRecord p : memoria) {
+            if (p.getUserCode() == userCode
+                    &amp;&amp; p.getTimestampMillis() &gt;= fromMillis
+                    &amp;&amp; p.getTimestampMillis() &lt; toMillis) {
+                res.add(p);
+            }
+        }
+        return res;
+    }
+
+    private static long epoch(int y, int m, int d, int h, int min, ZoneId zona) {
+        return LocalDateTime.of(y, m, d, h, min).atZone(zona).toInstant().toEpochMilli();
+    }
+}</code></pre></details>
+<details><summary>PunchRecord.java<small>Adaptee (tipo del fabricante) · src/com/fabricanteb/sdk/PunchRecord.java</small></summary><pre><code>package com.fabricanteb.sdk;
+
+/** Estructura propia del fabricante (biblioteca NO modificable). */
+public class PunchRecord {
+    private final int userCode;
+    private final long timestampMillis;
+    private final TipoMarcacion type;
+
+    public PunchRecord(int userCode, long timestampMillis, TipoMarcacion type) {
+        this.userCode = userCode;
+        this.timestampMillis = timestampMillis;
+        this.type = type;
+    }
+
+    public int getUserCode() { return userCode; }
+    public long getTimestampMillis() { return timestampMillis; }
+    public TipoMarcacion getType() { return type; }
+}</code></pre></details>
+<details><summary>TipoMarcacion.java<small>Adaptee (tipo del fabricante) · src/com/fabricanteb/sdk/TipoMarcacion.java</small></summary><pre><code>package com.fabricanteb.sdk;
+
+/** Tipo propio del fabricante (biblioteca NO modificable). */
+public enum TipoMarcacion { CHECK_IN, CHECK_OUT }</code></pre></details>
+<details><summary>Main.java<small>Demostración · src/universidad/Main.java</small></summary><pre><code>package universidad;
+
+import com.fabricanteb.sdk.BiometricDeviceSdk;
+import universidad.asistencia.ServicioAsistencia;
+import universidad.asistencia.SistemaAsistencia;
+import universidad.dispositivos.AdaptadorFabricanteB;
+import universidad.dispositivos.DispositivoProveedorA;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+
+public class Main {
+    public static void main(String[] args) {
+        LocalDate fecha = LocalDate.of(2026, 10, 15);
+
+        ServicioAsistencia proveedorA = new DispositivoProveedorA();
+        ServicioAsistencia fabricanteB =
+                new AdaptadorFabricanteB(new BiometricDeviceSdk(), ZoneId.systemDefault());
+
+        System.out.println("Proveedor A : " + new SistemaAsistencia(proveedorA).consultar("1001", fecha));
+        System.out.println("Fabricante B: " + new SistemaAsistencia(fabricanteB).consultar("1001", fecha));
+        System.out.println("Fabricante B: " + new SistemaAsistencia(fabricanteB).consultar("2002", fecha));
+    }
+}</code></pre></details>
+
+<h3>Compilación y ejecución</h3>
+<pre><code>javac -d out $(find src -name "*.java")
+java -cp out universidad.Main</code></pre>
+<h3>Salida obtenida</h3>
+<pre><code>Proveedor A : 1001 | 2026-10-15 | ingreso 08:00 | salida 17:00
+Fabricante B: 1001 | 2026-10-15 | ingreso 07:52 | salida 16:48
+Fabricante B: 2002 | 2026-10-15 | sin registros</code></pre>
+<p>El mismo cliente funciona igual con el proveedor histórico y con el nuevo fabricante, y no conoce las particularidades de este último.</p>
+
+<h2 id="correspondencia"><span class="n">6</span>Correspondencia UML ↔ código</h2>
+<ul>
+  <li>Cada clase, atributo y método del diagrama existe en el código con el mismo nombre y la misma firma.</li>
+  <li>Realización (<code>..|&gt;</code>) = <code>implements ServicioAsistencia</code> en <code>DispositivoProveedorA</code> y <code>AdaptadorFabricanteB</code>.</li>
+  <li>Asociación <code>AdaptadorFabricanteB → BiometricDeviceSdk</code> = atributo <code>private final BiometricDeviceSdk sdk</code>, inyectado por constructor (composición).</li>
+  <li>Asociación <code>SistemaAsistencia → ServicioAsistencia</code> = atributo <code>private final ServicioAsistencia servicio</code>. El cliente no importa nada de <code>com.fabricanteb.sdk</code>.</li>
+  <li>Dependencias «retorna» = tipos de retorno <code>Optional&lt;RegistroAsistencia&gt;</code> y <code>List&lt;PunchRecord&gt;</code>.</li>
+</ul>
+
+<h2 id="ia"><span class="n">7</span>Uso crítico de IA</h2>
+<h3>Prompt principal</h3>
+<blockquote>Actúa como Arquitecto de Patrones de diseño de software. Para el Escenario 02 (sistema de asistencia universitario que debe integrar dispositivos biométricos de un nuevo fabricante con biblioteca no modificable e interfaz distinta): identifica el problema estructural, selecciona y justifica el patrón estructural, elabora el diagrama UML, identifica los participantes, implementa la solución en Java y mantén la correspondencia entre UML y código.</blockquote>
+
+<div class="grid" style="margin-top:16px">
+  <div class="box ok">
+    <h3>Recomendación aceptada</h3>
+    <p><strong>Recomendación:</strong> usar <em>Adapter de objetos</em> (composición) en lugar de Adapter de clases (heredar del SDK).</p>
+    <p><strong>Justificación:</strong> Java no permite heredar de dos clases, el SDK puede ser <code>final</code> o cambiar entre versiones, y la composición permite inyectar el SDK (incluso un <em>mock</em> en pruebas). Además deja al cliente totalmente aislado del proveedor, como pide el escenario.</p>
+  </div>
+  <div class="box mod">
+    <h3>Recomendación modificada / rechazada</h3>
+    <p><strong>Recomendación original:</strong> devolver <code>null</code> cuando no hubiera marcaciones y añadir una <em>Abstract Factory</em> / registro de proveedores para elegir el dispositivo por configuración.</p>
+    <p><strong>Decisión:</strong> se reemplazó <code>null</code> por <code>Optional&lt;RegistroAsistencia&gt;</code> y se <strong>rechazó</strong> la fábrica.</p>
+    <p><strong>Justificación:</strong> <code>Optional</code> deja explícita en el contrato la ausencia de registros y evita <code>NullPointerException</code>. La fábrica resuelve un problema de <em>creación</em>, no estructural, y está fuera del alcance del escenario. Con el Adapter basta para incorporar proveedores futuros (un adaptador por proveedor).</p>
+  </div>
+</div>
+
+</main>
+</body>
+</html>
